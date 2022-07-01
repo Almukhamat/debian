@@ -1,0 +1,277 @@
+#!/bin/bash
+
+#/bin/su root
+
+export DISPLAY=:0.0
+export XAUTHORITY=/home/z/.Xauthority
+export PATH=$PATH:/sbin:/usr/sbin:/usr/local/bin
+
+#if ! [ "$(lsb_release -d)" = $'Description:    Runtu LITE 18.04 x64' ]; then 
+#echo THIS NOT UBUNTU 18.04 
+#break
+#fi
+
+echo Begin install need programms and settings..
+
+# время
+date -s "$(wget -S -O /dev/null vnc3.ik 2>&1 | sed -n -e '/ *Date: */ {' -e s///p -e q -e '}')" 
+# период. сихронизациявремени.
+/bin/sh -c "echo 'NTP=time.ik' >> /etc/systemd/timesyncd.conf"
+systemctl enable systemd-timesyncd
+timedatectl set-ntp on
+timedatectl set-ntp true
+timedatectl set-timezone Asia/Yekaterinburg
+systemctl restart systemd-timesyncd
+touch /root/.sum.time
+
+if ! [ -d /home/z/install ]; then
+mkdir /home/z/install
+else
+rm -r -f /home/z/install
+mkdir /home/z/install
+fi
+
+chmod 0777 /home/z/install
+cd /home/z/install
+
+# Пингуем прокси
+ping -I 192.168.5.2 -c 3 -n -q ${HOST} > /dev/null
+# Если возникла ошибка (хост не доступен)
+if [ $? -ne "0" ]; then
+proxy1=false
+echo не доступен прокси!, проверь хост
+read -p "Press enter to continue"
+else
+proxy1=true
+fi
+proxy1=true
+
+if [ "$proxy1" = true ]; then
+export http_proxy=http://192.168.5.2:3128
+export https_proxy=http://192.168.5.2:3128
+ if [ -f /etc/wgetrc ]; then
+rm -f /etc/wgetrc
+ fi
+/bin/sh -c "echo 'use_proxy=on' >> /etc/wgetrc"
+/bin/sh -c "echo 'http_proxy = http://192.168.5.2:3128' >> /etc/wgetrc"
+/bin/sh -c "echo 'https_proxy = http://192.168.5.2:3128' >> /etc/wgetrc"
+/bin/sh -c "echo 'http_proxy = http://192.168.5.2:3128' >> /etc/wgetrc"
+/bin/sh -c "echo 'ftp_proxy = http://192.168.5.2:3128' >> /etc/wgetrc"
+ if [ -f /etc/apt/apt.conf.d/proxy.conf ]; then
+rm -f /etc/apt/apt.conf.d/proxy.conf
+ fi
+touch /etc/apt/apt.conf.d/proxy.conf
+/bin/sh -c '(echo "Acquire::http::proxy \"http://192.168.5.2:3128/\";"; echo "Acquire::ftp::proxy \"http://192.168.5.2:3128/\";"; echo "Acquire::https::proxy \"http://192.168.5.2:3128/\";") > /etc/apt/apt.conf.d/proxy.conf'
+fi
+
+if [ -f /etc/apt/sources.list.d/zabbix.list ]; then
+rm -f /etc/apt/sources.list.d/zabbix.list
+fi
+cd /home/z/install
+wget -q -r --show-progress --proxy=off -O zabbix-release_4.0-2+bionic_all.deb http://www.ik/ubuntu/zabbix/zabbix-release_4.0-2+bionic_all.deb
+dpkg -i /home/z/install/zabbix-release_4.0-2+bionic_all.deb
+#/bin/sh -c "echo 'deb http://repo.zabbix.com/zabbix/4.0/ubuntu bionic main' >> /etc/apt/sources.list.d/zabbix.list"
+#/bin/sh -c "echo 'deb-src http://repo.zabbix.com/zabbix/4.0/ubuntu bionic main' >> /etc/apt/sources.list.d/zabbix.list"
+if [ "$proxy1" = true ]; then
+apt-key adv --keyserver-options http-proxy=http://192.168.5.2:3128/ --keyserver keyserver.ubuntu.com --recv-keys 082AB56BA14FE591
+else
+apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 082AB56BA14FE591
+fi
+
+MACHINE_TYPE=`uname -m`
+if [ ${MACHINE_TYPE} == 'x86_64' ]; then
+echo This system is x64
+#wget -q -O - https://repo.yandex.ru/yandex-browser/YANDEX-BROWSER-KEY.GPG | apt-key add -
+wget -q --proxy=off http://www.ik/ubuntu/key/YANDEX-BROWSER-KEY.GPG -O - | apt-key add -
+sudo sh -c 'echo "deb [arch=amd64] http://repo.yandex.ru/yandex-browser/deb beta main" > /etc/apt/sources.list.d/yandex-browser-beta.list'
+if [ "$proxy1" = true ]; then
+apt-key adv --keyserver-options http-proxy=http://192.168.5.2:3128/ --keyserver keyserver.ubuntu.com --recv-keys 218017D1CC5FDb34
+else
+apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 218017D1CC5FDb34
+fi
+#wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add -
+#apt-key adv --keyserver-options http-proxy=http://192.168.5.2:3128/ --keyserver keyserver.ubuntu.com --recv-keys 6494C6D6997C215E
+wget -q --proxy=off http://www.ik/ubuntu/key/linux_signing_key.pub -O - | apt-key add -
+if [ "$proxy1" = true ]; then
+apt-key adv --keyserver-options http-proxy=http://192.168.5.2:3128/ --keyserver keyserver.ubuntu.com --recv-keys 6494C6D6997C215E
+else
+apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 6494C6D6997C215E
+fi
+sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list'
+fi
+
+echo Чистка удаление не нужных
+apt-get --assume-yes remove firefox qt5ct transmission-gtk modem-manager-gui gpicview uget
+rm -r -f /home/z/.config/qt5ct
+rm -f /home/z/.config/autostart/blueman.desktop
+if [ -f /etc/apt/sources.list.d/nextcloud-dev-ubuntu-client-bionic.list ]; then
+rm -f /etc/aptsources.list.d/nextcloud-dev-ubuntu-client-bionic.list
+fi
+if [ -f /etc/apt/sources.list.d/mozillateam-ubuntu-ppa-bionic.list ]; then
+rm -f /etc/apt/sources.list.d/mozillateam-ubuntu-ppa-bionic.list
+fi
+if [ -f /etc/apt/sources.list.d/home:stevenpusser.list ]; then
+rm -f /etc/apt/sources.list.d/home:stevenpusser.list
+fi
+echo Добавляем firefox esr и Некстклауд, драйвера.
+add-apt-repository --yes ppa:mozillateam/ppa
+add-apt-repository --yes ppa:nextcloud-devs/client
+add-apt-repository --yes ppa:videolan/master-daily
+add-apt-repository --yes ppa:nomacs/stable
+add-apt-repository ppa:oibaf/graphics-drivers
+
+/bin/sh -c "echo 'deb http://download.opensuse.org/repositories/home:/stevenpusser/xUbuntu_18.04/ /' > /etc/apt/sources.list.d/home:stevenpusser.list"
+# key apt palemoon
+#wget -q -r --proxy=off https://download.opensuse.org/repositories/home:stevenpusser/xUbuntu_18.04/Release.key -O - | apt-key add -
+wget -q --proxy=off http://www.ik/ubuntu/key/palemoon-Release.key -O - | apt-key add -
+if [ "$proxy1" = true ]; then
+apt-key adv --keyserver-options http-proxy=http://192.168.5.2:3128/ --keyserver keyserver.ubuntu.com --recv-keys 0FAD31CA8719FCE4
+else
+apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 0FAD31CA8719FCE4
+fi
+
+if [ ${MACHINE_TYPE} == 'x86_64' ]; then
+dpkg -add-architecture i386
+fi
+apt-get update
+apt-get dist-upgrade --assume-yes
+echo Begin install need programms
+
+apt-get install --assume-yes ssh net-tools ethtool smbclient cifs-utils smbnetfs python-smbc xtightvncviewer autocutsel x11vnc
+apt-get install --assume-yes avahi-utils ttf-mscorefonts-installer lsb ghostscript openssl hunspell-ru
+apt-get install --assume-yes cups cups-pdf system-config-printer-gnome hplip hplip-gui
+apt-get install --assume-yes cabextract unrar arj mpack p7zip-rar p7zip-full unace xarchiver
+apt-get install --assume-yes nano obconf fbreader evince python xsane gimp  simple-scan qtwayland5 libavcodec-extra
+apt-get install --assume-yes nautilus shotwell seahorse nomacs nomacs-l10n obconf obmenu
+apt-get install --assume-yes wine-stable zenity gxmessage
+apt-get install --assume-yes exfat-fuse exfat-utils ntfs-3g ntfsprogs
+apt-get install --assume-yes xfonts-base xfonts-cyrillic xfonts-100dpi console-cyrillic gsfonts lm-sensors xterm
+apt-get install --assume-yes fonts-averia-gwf fonts-cardo fonts-comfortaa fonts-dosis fonts-droid-fallback fonts-emojione fonts-hack-ttf
+apt-get install --assume-yes fonts-liberation fonts-open-sans fonts-uralic fonts-dejavu     
+apt-get install --assume-yes build-essential libgtk2.0-dev intltool libelf-dev dc autoconf automake libtool autotools-dev dpkg-dev fakeroot
+apt-get install --assume-yes bleachbit xpad gnome-games thunderbird thunderbird-locale-ru
+apt-get install --assume-yes nextcloud-client 
+apt-get install --assume-yes firefox-esr firefox-esr-locale-ru
+apt-get install --assume-yes palemoon
+
+
+echo install fonts
+cd /home/z/install
+wget -q -r --show-progress --proxy=off http://www.ik/ubuntu/sourceforge/corefonts/msfonts.zip -O/home/z/install/msfonts.zip
+unzip -o /home/z/install/msfonts.zip -d /usr/share/fonts/truetype/msttcorefonts/
+wget -q -r --show-progress --proxy=off http://www.ik/ubuntu/sourceforge/corefonts/russfonts.zip -O/home/z/install/russfonts.zip
+unzip -o /home/z/install/russfonts.zip -d /usr/share/fonts/russfonts/
+fc-cache -fv
+
+if [ -f /etc/sysctl.d/99-sysctl.conf ]; then
+rm -f /etc/sysctl.d/99-sysctl.conf
+fi
+/bin/sh -c "echo 'net.ipv6.conf.all.disable_ipv6 = 1' >> /etc/sysctl.d/99-sysctl.conf"
+/bin/sh -c "echo 'net.ipv6.conf.default.disable_ipv6 = 1' >> /etc/sysctl.d/99-sysctl.conf"
+/bin/sh -c "echo 'net.ipv6.conf.lo.disable_ipv6 = 1' >> /etc/sysctl.d/99-sysctl.conf"
+/bin/sh -c "echo 'vm.swappiness=15' >> /etc/sysctl.d/99-sysctl.conf"
+/bin/sh -c "echo 'vm.laptop_mode = 5' >> /etc/sysctl.d/99-sysctl.conf"
+/bin/sh -c "echo 'vm.dirty_writeback_centisecs = 6000' >> /etc/sysctl.d/99-sysctl.conf"
+
+touch /root/.sum.sysctl.conf
+
+# zabbix
+apt-get install --assume-yes zabbix-agent
+rm -f /etc/zabbix/zabbix-agentd.conf
+touch /etc/zabbix/zabbix-agentd.conf
+systemctl stop zabbix-agent.service
+/bin/sh -c "echo 'PidFile=/run/zabbix/zabbix_agentd.pid' >> /etc/zabbix/zabbix-agentd.conf"
+/bin/sh -c "echo 'LogType=file' >> /etc/zabbix/zabbix-agentd.conf"
+/bin/sh -c "echo 'LogFile=/var/log/zabbix/zabbix_agentd.log' >> /etc/zabbix/zabbix-agentd.conf"
+/bin/sh -c "echo 'LogFileSize=1' >> /etc/zabbix/zabbix-agentd.conf"
+/bin/sh -c "echo '#EnableRemoteCommands=1' >> /etc/zabbix/zabbix-agentd.conf"
+/bin/sh -c "echo '#LogRemoteCommands=1' >> /etc/zabbix/zabbix-agentd.conf"
+/bin/sh -c "echo 'Server=zabbix.ik' >> /etc/zabbix/zabbix-agentd.conf"
+/bin/sh -c "echo 'ServerActive=zabbix.ik' >> /etc/zabbix/zabbix-agentd.conf"
+/bin/sh -c "echo 'HostnameItem=system.hostname' >> /etc/zabbix/zabbix-agentd.conf"
+/bin/sh -c "echo 'HostMetadataItem=system.uname' >> /etc/zabbix/zabbix-agentd.conf"
+/bin/sh -c "echo 'Timeout=10' >> /etc/zabbix/zabbix-agentd.conf"
+systemctl disable zabbix-agent.service
+#systemctl stop zabbix-agent.service
+touch /root/.sum.zabbix-4.1
+
+# Install tigerVNC
+if [ -f /lib/systemd/system/x0vncserver.service ]; then
+systemctl enable x0vncserver.service
+rm -f /lib/systemd/system/x0vncserver.service
+fi
+
+MACHINE_TYPE=`uname -m`
+if [ ${MACHINE_TYPE} == 'x86_64' ]; then
+wget -q -r --show-progress --proxy=off www.ik/ubuntu/runtu18/tigervnc/tigervnc-x86_64.tar.bz2 -O/home/z/install/tigervnc.tar.bz2
+apt-get install --assume-yes wine32-preloader:i386
+apt-get install --assume-yes libreoffice libreoffice-lightproof-ru-ru hunspell-ru libreoffice-help-ru libreoffice-l10n-ru libreoffice-gtk2 libreoffice-gnome libreoffice-systray libreoffice-style-human libreoffice-style-breeze ibreoffice-style-oxygen libreoffice-style-tango libreoffice-templates libreoffice-pdfimport libreoffice-officebean
+apt-get install --assume-yes --install-recommends linux-generic-hwe-18.04 xserver-xorg-hwe-18.04
+#cd /home/z/install
+#wget -q -r --proxy=off http://download.sputnik.ru/browser/ubuntu_sputnik-browser-stable_amd64.deb
+else
+wget -q -r --proxy=off www.ik/ubuntu/runtu18/tigervnc/tigervnc-i386.tar.bz2 -O/home/z/install/tigervnc.tar.bz2
+apt-get install --assume-yes claws-mail
+apt-get install --assume-yes abiword
+fi
+cd /home/z/install/
+tar -xjvf tigervnc.tar.bz2 -C /
+chown  z.z /home/z/.vnc/passwd
+systemctl daemon-reload
+systemctl enable x0vncserver.service
+systemctl start x0vncserver.service
+touch /root/.sum.tigervnc-1.9
+
+# Install Lexema 5.5
+wget -q -r --show-progress --proxy=off www.ik/ubuntu/runtu18/Lexema/lexema.tar.bz2 -O/home/z/install/lexema.tar.bz2
+cd /home/z/install
+tar -xjvf lexema.tar.bz2 -C /
+/bin/su z -c 'WINEARCH=win32 wineboot'
+/bin/su z -c 'WINEARCH=win32 winetricks corefonts mdac28 winxp'
+/bin/su z -c 'WINEARCH=win32 regedit -s /opt/lexema/lexema.reg'
+touch /root/.sum.lexema-1.0
+
+# pdf
+wget -q -r --show-progress --proxy=off www.ik/ubuntu/runtu18/pdf/AdbeRdr9.5.5-1_i386linux_enu.deb -O/home/z/install/AdbeRdr9.5.5-1_i386linux_enu.deb
+cd /home/z/install
+dpkg -i AdbeRdr9.5.5-1_i386linux_enu.deb
+apt-get install -f -y
+
+# службы
+systemctl enable cron.service
+systemctl disable bluetooth.service
+
+# Права
+usermod -aG lpadmin z
+
+#smb
+sed 's/^[ \t]*//' /etc/samba/smb.conf
+/bin/sed -i '/\[global\]/a min protocol=NT1\nmax protocol=SMB3\nclient max protokol = SMB3' /etc/samba/smb.conf
+/bin/sed -i 's/client max protokol = NT1/client max protokol = SMB3/' /etc/samba/smb.conf
+
+# print foo2zjs
+cd /home/z/install
+wget -q -r --show-progress -O foo2zjs.tar.gz http://foo2zjs.rkkda.com/foo2zjs.tar.gz
+tar zxf foo2zjs.tar.gz
+cd foo2zjs
+make
+./getweb all
+make install
+make cups
+systemctl restart cups.service
+
+apt-get autoremove --assume-yes 
+
+crontab -r
+wget --show-progress --no-proxy http://www.ik/ubuntu/runtu18/sysupdstart -O/root/sysupdstart
+chmod a+x /root/sysupdstart
+echo `date | cut -f3 -d: | cut -f1 -d" "` "* * * *" /root/sysupdstart | crontab -
+cd /root
+. ./sysupdstart
+
+echo All Done.
+#rm -f /tmp/ubinst /tmp/ubinst_
+
+#echo installing Windows
+#wget -q --no-proxy http://www.ik/ubuntu/wine/ubinst -O/tmp/ubinst_
+#. /tmp/ubinst_
