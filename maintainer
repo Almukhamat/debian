@@ -1,0 +1,53 @@
+1. Создание пакетов получилось сделать в изолированной среде через pbuild
+
+cat /etc/pbuilderrc
+
+# this is your configuration file for pbuilder.
+# the file in /usr/share/pbuilder/pbuilderrc is the default template.
+# /etc/pbuilderrc is the one meant for overwriting defaults in
+# the default template
+#
+# read pbuilderrc.5 document for notes on specific options.
+
+# адрес зеркала с пакетами
+MIRRORSITE="http://mirror.yandex.ru/debian/"
+
+# выбираем дистрибутив для использования
+: ${DIST:="$(lsb_release --short --codename)"}
+
+# выбираем архитектуру
+: ${ARCH:="$(dpkg --print-architecture)"}
+
+# определяем имя, которым мы будем обозначать отдельный образ
+NAME="$DIST"
+if [ -n "${ARCH}" ]; then
+    NAME="$NAME-$ARCH"
+    # собираем под разные архитектуры
+    DEBOOTSTRAPOPTS=("--arch" "$ARCH" "${DEBOOTSTRAPOPTS[@]}")
+fi
+
+# место для создания файла образа
+BASETGZ="/home/user/pbuilder/$NAME-base.tgz"
+DISTRIBUTION="$DIST"
+# место для  собранных пакетов
+BUILDRESULT="/home/user/pbuilder/$DIST/result/"
+# тут у нас будет лежать кэш слитых из сети пакетов
+#APTCACHE="/home/user/pbuilder/$NAME/aptcache/"
+# а в это место будет распаковываться образ для сборки
+BUILDPLACE="/home/user/pbuilder/build/"
+
+#EOF
+ 
+2. Создаем образ системы
+sudo ARCH=i386 DIST=bullseye pbuilder --create
+
+3. Скачиваем исходный код
+apt source bash (sed,gawk)
+
+4. Переходим в папку с кодом
+cd /bash-5.1
+
+5. Запускаем сборку
+sudo DIST=bullseye ARCH=i386 pdebuild
+
+6. Файл пакета сохранился в папке по указанному в файле /etc/pbuilderrc пути
